@@ -20,14 +20,21 @@ async function main() {
   }
 
   const start = Date.now();
-  const { report, rounds, sources } = await runResearch(question);
+  const { report, rounds, sources, verifications } = await runResearch(question);
   const elapsed = ((Date.now() - start) / 1000).toFixed(1);
 
   // Traces are written to stderr; the clean Markdown report goes to stdout.
   console.log("\n" + report + "\n");
 
+  const disputed = (verifications ?? []).filter(
+    (v) => v.verdict === "disputed"
+  ).length;
+  const verified = (verifications ?? []).length - disputed;
+
   console.error(
-    `\n🏁 完成：${rounds} 轮搜索，收集 ${sources.length} 个来源，用时 ${elapsed}s。`
+    `\n🏁 完成：${rounds} 轮搜索，收集 ${sources.length} 个来源，` +
+      `核查 ${verifications?.length ?? 0} 条结论（${verified} verified / ${disputed} disputed），` +
+      `用时 ${elapsed}s。`
   );
 
   // Persist a copy of the report for convenience.
