@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { tavilySearch } from "./tavily.js";
+import { verifyReport } from "./verify.js";
 
 const DEFAULT_MODEL = "claude-sonnet-4-6";
 
@@ -83,7 +84,7 @@ function logThinking(text) {
  *
  * @param {string} question
  * @param {object} [opts]
- * @returns {Promise<{report: string, rounds: number, sources: Array<{title: string, url: string}>}>}
+ * @returns {Promise<{report: string, rounds: number, sources: Array<{title: string, url: string}>, verifications: Array}>}
  */
 export async function runResearch(question, opts = {}) {
   const apiKey = opts.anthropicApiKey ?? process.env.ANTHROPIC_API_KEY;
@@ -100,6 +101,9 @@ export async function runResearch(question, opts = {}) {
   // Allow injecting a client / search fn for testing; default to the real ones.
   const client = opts.client ?? new Anthropic({ apiKey });
   const search = opts.search ?? tavilySearch;
+  // Verification (skeptic pass) is part of the research flow; only disabled
+  // explicitly (e.g. for isolated tests of the search loop).
+  const verify = opts.verify !== false;
 
   // Prompt caching: mark the system prompt + tools as cacheable so that the
   // (large, static) instructions are reused across the many turns of the loop.
@@ -152,14 +156,40 @@ export async function runResearch(question, opts = {}) {
     }
 
     if (response.stop_reason !== "tool_use") {
-      // The agent decided it has enough information -> final report.
-      const report = response.content
+      // The agent decided it has enough information -> draft report.
+      const draft = response.content
         .filter((b) => b.type === "text")
         .map((b) => b.text)
         .join("\n")
         .trim();
-      console.error(`\n✅ Agent 判断信息已充足，共进行了 ${round} 轮搜索，开始输出报告。`);
-      return { report, rounds: round, sources };
+      console.error(`\n✅ Agent 判断信息已充足，共进行了 ${round} 轮搜索，生成初稿。`);
+
+      if (!verify) {
+        return { report: draft, rounds: round, sources, verifications: [] };
+      }
+
+      // Mandatory skeptic pass: try to refute each core conclusion.
+      const {
+        report: verifiedReport,
+        verifications,
+        extraSources,
+      } = await verifyReport(draft, {
+        client,
+        search,
+        model,
+        searchDepth,
+        maxResults,
+        anthropicApiKey: apiKey,
+      });
+
+      for (const s of extraSources) {
+        if (s.url && !seenUrls.has(s.url)) {
+          seenUrls.add(s.url);
+          sources.push(s);
+        }
+      }
+
+      return { report: verifiedReport, rounds: round, sources, verifications };
     }
 
     // Record assistant turn (must be echoed back verbatim).
