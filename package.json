@@ -1,0 +1,18 @@
+{
+  "name": "auto-research-agent",
+  "version": "1.0.0",
+  "description": "Autonomous research agent: Claude (with prompt caching) + Tavily Search. Decomposes a question, searches iteratively, and produces a sourced Markdown report.",
+  "type": "module",
+  "main": "run.js",
+  "scripts": {
+    "start": "node run.js",
+    "test": "node test/smoke.test.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.65.0",
+    "dotenv": "^16.4.5"
+  }
+}
