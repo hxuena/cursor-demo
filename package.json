@@ -6,7 +6,7 @@
   "main": "run.js",
   "scripts": {
     "start": "node run.js",
-    "test": "node test/smoke.test.mjs"
+    "test": "node test/smoke.test.mjs && node test/perspectives.test.mjs"
   },
   "engines": {
     "node": ">=18"
